@@ -22,6 +22,17 @@ const ADMIN_HASH_QUERY = /^#\/?admin(\?.*)?$/
 // 私有站跳转、主题入口共用的标准后台地址
 export const ADMIN_ENTRY_URL = `${ADMIN_PATH}${ADMIN_HASH}`
 
+/**
+ * 后台入口地址，按部署形态自动适配：
+ * - 独立域名 / Worker 根路径（BASE_URL === '/'）：走 /admin，由 Worker 返回 index
+ * - 子路径静态托管（如 GitHub Pages，VITE_BASE === './'）：走 ./#/admin，
+ *   否则绝对路径 /admin 会跳出仓库目录变成 404
+ */
+export const resolveAdminEntryHref = () => {
+  const base = (typeof import.meta !== 'undefined' && import.meta.env && import.meta.env.BASE_URL) || '/'
+  return base === '/' ? ADMIN_ENTRY_URL : `${base}#/admin`
+}
+
 export const isAdminPath = (pathname) => {
   const path = pathname ?? (typeof window !== 'undefined' ? window.location.pathname : '')
   return path === ADMIN_PATH || path.startsWith(`${ADMIN_PATH}/`)

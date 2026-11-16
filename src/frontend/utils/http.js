@@ -1,5 +1,6 @@
 import { getApiBases } from './config'
 import { STORAGE } from './constants'
+import { resolveAdminEntryHref, isAdminPath } from '../router/adminEntryUrl'
 
 const DEFAULT_ERROR_MESSAGES = {
   401: 'Unauthorized',
@@ -13,21 +14,18 @@ const TURNSTILE_VERIFIED_KEY = STORAGE.TURNSTILE_VERIFIED
 // 未启用的请求（如 /updateDatabase、长历史查询）保持无超时，避免误伤合法慢接口
 export const DEFAULT_REQUEST_TIMEOUT_MS = 15_000
 
-const getAdminPath = () => {
-  return '/admin'
-}
-
 const redirectToAdminLogin = () => {
   if (typeof window === 'undefined') return
 
-  const adminPath = getAdminPath()
-  if (window.location.pathname === adminPath || window.location.pathname.startsWith(`${adminPath}/`)) {
+  // 子路径静态托管（如 GitHub Pages）下后台入口是 ./#/admin，不能再按 pathname 判定
+  const onAdminPage = isAdminPath(window.location.pathname) || window.location.hash.startsWith('#/admin')
+  if (onAdminPage) {
     // 401 时 handleResponse 已清除 jwt_token，reload 后后台落到登录页，不会再次触发 401
     window.location.reload()
     return
   }
 
-  window.location.assign(adminPath)
+  window.location.assign(resolveAdminEntryHref())
 }
 
 const createHeaders = (includeAuth = true, includeTurnstile = true, baseUrl = null, options = {}) => {

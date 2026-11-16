@@ -12,7 +12,7 @@ import { checkAuth, hasAppPasswordAccess, simpleAuthResponse } from './middlewar
 import { getServerDetail, getMetricsHistoryCache, setMetricsHistoryCache, getCacheDuration } from './utils/cache.js';
 import { AppError, createSuccessResponse, createUnauthorizedResponse, createBadRequestResponse, createNotFoundResponse, createErrorResponse } from './utils/errors.js';
 import { verifyTurnstileToken } from './utils/common.js';
-import { getCorsAllowedOrigins, createOptionsResponse, applyCors } from './utils/cors.js';
+import { getCorsAllowedOrigins, createOptionsResponse, applyCors, createCorsHeaders } from './utils/cors.js';
 import { getRemoteVersion } from './utils/version.js';
 import {
   HISTORY_ALL_QUERY_COLUMNS
@@ -192,6 +192,29 @@ export default {
     const path = url.pathname;
 
     const corsAllowedOrigins = getCorsAllowedOrigins(env);
+
+    // 限流：只拦公开读取接口与管理入口（含登录），防止扫描器刷 D1 / Workers 免费额度。
+    // Agent 上报 /update 与实时通道 /api/ws 不在此列，避免探针掉线。
+    if (env.RATE_LIMITER && (
+      path.startsWith('/api/servers') ||
+      path.startsWith('/api/server') ||
+      path.startsWith('/api/history') ||
+      path.startsWith('/admin/api')
+    )) {
+      const clientIp = request.headers.get('CF-Connecting-IP') || 'unknown';
+      const bucket = path.startsWith('/admin/api') ? 'admin' : 'read';
+      const { success } = await env.RATE_LIMITER.limit({ key: `${bucket}:${clientIp}` });
+      if (!success) {
+        return new Response(JSON.stringify({ error: 'Too Many Requests', code: 429 }), {
+          status: 429,
+          headers: {
+            'Content-Type': 'application/json',
+            'Retry-After': '60',
+            ...Object.fromEntries(createCorsHeaders(request.headers.get('Origin'), corsAllowedOrigins))
+          }
+        });
+      }
+    }
     
     if (!env.API_SECRET || env.API_SECRET.length === 0) {
       const response = createBadRequestResponse('API_SECRET is required');

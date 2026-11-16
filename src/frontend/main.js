@@ -1,7 +1,7 @@
 import { createApp } from 'vue'
 import App from './App.vue'
 import router from './router'
-import { ADMIN_ENTRY_URL, isAdminPath } from './router/adminEntryUrl'
+import { resolveAdminEntryHref, isAdminPath } from './router/adminEntryUrl'
 import './styles/main.css'
 import './styles/light.css'
 import { STORAGE } from './utils/constants'
@@ -367,7 +367,7 @@ async function initApp() {
   app.use(router)
   app.mount('#app').$nextTick(() => {
     if (!isAdmin && !config.is_public && !config.authorization) {
-      window.location.replace(ADMIN_ENTRY_URL)
+      window.location.replace(resolveAdminEntryHref())
     }
     const loading = document.getElementById('loading')
     if (loading) {
